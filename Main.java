@@ -15,5 +15,10 @@ public class Main {
             System.out.println("Corrupt file."); 
             return; 
         }
+        
+        while (true) {
+            System.out.print("1:Add Web  2:Add WiFi  3:View  4:Save & Exit\n> ");
+            int c = s.nextInt(); s.nextLine();
+        }
     }
 }
