@@ -19,6 +19,16 @@ public class Main {
         while (true) {
             System.out.print("1:Add Web  2:Add WiFi  3:View  4:Save & Exit\n> ");
             int c = s.nextInt(); s.nextLine();
+            
+            if (c == 1) {
+                System.out.print("Name, User, Pass (comma separated): ");
+                String[] in = s.nextLine().split(",");
+                v.add(new WebLogin(in[0], in[1], in[2]));
+            } else if (c == 2) {
+                System.out.print("SSID, Pass (comma separated): ");
+                String[] in = s.nextLine().split(",");
+                v.add(new WifiNetwork(in[0], in[1]));
+            }
         }
     }
 }
