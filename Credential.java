@@ -1,16 +1,17 @@
-// This is an abstract blueprint class. It cannot be used directly, 
-// but it gives common rules and fields for specific types of credentials (like Web or WiFi).
+// The parent class for all saved items (WebLogin and WifiNetwork).
+// It is abstract, so you can't create a plain "Credential" - only its child classes.
 public abstract class Credential {
-    // Protected fields can be accessed by any class that inherits from Credential.
-    protected String name, pass;
-    
-    // Constructor to initialize the name and password when a credential is created.
-    public Credential(String name, String pass) { 
-        this.name = name; 
-        this.pass = pass; 
+
+    // Every credential has a name and a password.
+    protected String name;
+    protected String password;
+
+    public Credential(String name, String password) {
+        this.name = name;
+        this.password = password;
     }
-    
-    // Abstract methods force child classes to write their own versions of these behaviors.
-    public abstract String toCsv();
-    public abstract void print();
+
+    // Each child class must decide how to:
+    public abstract String toCsv();  // turn itself into one line of text (for saving)
+    public abstract void print();    // show itself on the screen
 }

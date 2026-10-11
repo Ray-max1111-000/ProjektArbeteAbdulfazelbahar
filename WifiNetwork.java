@@ -1,18 +1,18 @@
-// WifiNetwork inherits from Credential, representing a saved WiFi router password.
+// A WiFi network. The name is the network name (SSID).
 public class WifiNetwork extends Credential {
-    
-    // Constructor passes the SSID name and password up to the parent class.
-    public WifiNetwork(String n, String p) { 
-        super(n, p); 
+
+    public WifiNetwork(String networkName, String password) {
+        super(networkName, password);
     }
-    
-    // Formats the WiFi details into a comma-separated string for file storage.
-    public String toCsv() { 
-        return "WIFI," + name + "," + pass; 
+
+    // Example: "WIFI,HomeWiFi,mypassword"
+    @Override
+    public String toCsv() {
+        return "WIFI," + name + "," + password;
     }
-    
-    // Prints formatted details of the WiFi network to the terminal.
-    public void print() { 
-        System.out.println("[WIFI] SSID: " + name + " | Pass: " + pass); 
+
+    @Override
+    public void print() {
+        System.out.println("[WIFI] SSID: " + name + " | Pass: " + password);
     }
 }

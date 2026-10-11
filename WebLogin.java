@@ -1,21 +1,21 @@
-// WebLogin inherits from the Credential class, representing a website login.
+// A website login. Inherits name + password from Credential, and adds a username.
 public class WebLogin extends Credential {
-    // Specific field unique to web logins (username or email).
-    private String user;
-    
-    // Constructor passes name and password up to the parent Credential class, and saves the user.
-    public WebLogin(String n, String u, String p) { 
-        super(n, p); 
-        this.user = u; 
+
+    private String username;
+
+    public WebLogin(String name, String username, String password) {
+        super(name, password);
+        this.username = username;
     }
-    
-    // Converts the object data into a plain text comma-separated line for saving to a file.
-    public String toCsv() { 
-        return "WEB," + name + "," + user + "," + pass; 
+
+    // Example: "WEB,Gmail,anna@gmail.com,secret123"
+    @Override
+    public String toCsv() {
+        return "WEB," + name + "," + username + "," + password;
     }
-    
-    // Prints formatted details of the website login directly to the terminal.
-    public void print() { 
-        System.out.println("[WEB] " + name + " | User: " + user + " | Pass: " + pass); 
+
+    @Override
+    public void print() {
+        System.out.println("[WEB] " + name + " | User: " + username + " | Pass: " + password);
     }
 }
