@@ -14,3 +14,4 @@ public class Crypto {
         return new String(c.doFinal(Base64.getDecoder().decode(data)));
     }
 }
+// Refactor crypto error handling
