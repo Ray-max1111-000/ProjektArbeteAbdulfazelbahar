@@ -3,7 +3,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.ByteBuffer;
 
 public class Authenticator {
-    public static final String SECRET = "JBSWY3DPEHPK3PXP";
+    public static final String SECRET = System.getenv("TOTP_SECRET") != null ? System.getenv("TOTP_SECRET") : "JBSWY3DPEHPK3PXP";
     
     public static boolean verify(int input) throws Exception {
         long time = System.currentTimeMillis() / 1000 / 30;
