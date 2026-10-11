@@ -9,5 +9,11 @@ public class Main {
             return;
         }
         s.nextLine(); 
+        
+        VaultManager v = new VaultManager("local_system_key_123");
+        if (!v.load()) { 
+            System.out.println("Corrupt file."); 
+            return; 
+        }
     }
 }
