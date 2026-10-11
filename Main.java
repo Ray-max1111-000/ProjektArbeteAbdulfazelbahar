@@ -28,6 +28,11 @@ public class Main {
                 System.out.print("SSID, Pass (comma separated): ");
                 String[] in = s.nextLine().split(",");
                 v.add(new WifiNetwork(in[0], in[1]));
+            } else if (c == 3) {
+                v.view();
+            } else if (c == 4) {
+                v.save(); 
+                break;
             }
         }
     }
