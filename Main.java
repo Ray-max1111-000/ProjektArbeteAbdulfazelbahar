@@ -1,79 +1,126 @@
-import java.util.Scanner;
+import java.io.IOException;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.security.GeneralSecurityException;
+import java.util.List;
+import javax.crypto.BadPaddingException;
 
-// The program starts here. It shows a menu in the terminal and reacts to your choices.
+// Console menu. Only asks and prints; all rules live in VaultManager and the Credential classes.
 public class Main {
 
-    private static final Scanner input = new Scanner(System.in);
+    private static final VaultManager vault = new VaultManager("local_system_key_123");
 
-    public static void main(String[] args) throws Exception {
-
-        // Step 1: Check the 2FA code from the phone app.
-        if (!checkTwoFactorCode()) {
-            System.out.println("Access Denied.");
+    public static void main(String[] args) throws GeneralSecurityException {
+        if (!Authenticator.verify(ConsoleInput.number("2FA code: "))) {
+            System.out.println("Access denied.");
+            return;
+        }
+        try {
+            vault.load();
+        } catch (BadPaddingException e) {
+            System.out.println("vault.dat is damaged or the key is wrong.");
+            return;
+        } catch (IOException | IllegalArgumentException e) {
+            System.out.println("Could not open the vault: " + e.getMessage());
             return;
         }
 
-        // Step 2: Open the vault and load saved passwords.
-        VaultManager vault = new VaultManager("local_system_key_123");
-        if (!vault.load()) {
-            System.out.println("Corrupt file.");
-            return;
-        }
-
-        // Step 3: Show the menu until the user chooses "Save & Exit".
-        boolean running = true;
-        while (running) {
-            int choice = askForMenuChoice();
-
-            if (choice == 1) {
-                addWebLogin(vault);
-            } else if (choice == 2) {
-                addWifiNetwork(vault);
-            } else if (choice == 3) {
-                vault.view();
-            } else if (choice == 4) {
-                vault.save();
-                running = false;
+        while (true) {
+            System.out.println("\n1 Add web  2 Add WiFi  3 Encrypt file  4 Decrypt file  5 View");
+            System.out.println("6 Search  7 Remove  8 Statistics  9 Save & exit");
+            int choice = ConsoleInput.number("> ");
+            if (choice == 9 && save()) {
+                return;
             }
+            handle(choice);
         }
     }
 
-    // Asks for the 6-digit code and checks it.
-    private static boolean checkTwoFactorCode() throws Exception {
-        System.out.print("Enter 2FA from Authenticator app: ");
-        int code = input.nextInt();
-        input.nextLine();
-        return Authenticator.verify(code);
+    private static void handle(int choice) {
+        try {
+            switch (choice) {
+                case 1: addWeb(); break;
+                case 2: addWifi(); break;
+                case 3: encryptFile(); break;
+                case 4: decryptFile(); break;
+                case 5: print(vault.getAll()); break;
+                case 6: print(vault.search(ConsoleInput.text("Search: "))); break;
+                case 7: remove(); break;
+                case 8: statistics(); break;
+                case 9: break;  // saving failed, stay in the menu
+                default: System.out.println("Choose 1-9.");
+            }
+        } catch (IllegalArgumentException e) {
+            System.out.println(e.getMessage());  // our own validation messages
+        } catch (NoSuchFileException e) {
+            System.out.println("File not found: " + e.getMessage());
+        } catch (BadPaddingException e) {
+            System.out.println("Wrong password or damaged file.");
+        } catch (IOException e) {
+            System.out.println("File error: " + e.getMessage());
+        } catch (GeneralSecurityException e) {
+            System.out.println("Encryption error: " + e.getMessage());
+        }
     }
 
-    // Prints the menu and returns the number the user typed.
-    private static int askForMenuChoice() {
-        System.out.print("1:Add Web  2:Add WiFi  3:View  4:Save & Exit\n> ");
-        int choice = input.nextInt();
-        input.nextLine();
-        return choice;
+    private static void addWeb() {
+        String name = ConsoleInput.text("Name: ");
+        String user = ConsoleInput.text("Username: ");
+        vault.add(new WebLogin(name, user, ConsoleInput.text("Password: ")));
+        System.out.println("Added.");
     }
 
-    // Choice 1: Add a website login.
-    private static void addWebLogin(VaultManager vault) {
-        System.out.print("Name, User, Pass (comma separated): ");
-        String[] parts = input.nextLine().split(",");
-
-        String name     = parts[0];
-        String username = parts[1];
-        String password = parts[2];
-
-        vault.add(new WebLogin(name, username, password));
+    private static void addWifi() {
+        String ssid = ConsoleInput.text("SSID: ");
+        vault.add(new WifiNetwork(ssid, ConsoleInput.text("Password: ")));
+        System.out.println("Added.");
     }
 
-    // Choice 2: Add a WiFi network.
-    private static void addWifiNetwork(VaultManager vault) {
-        System.out.print("SSID, Pass (comma separated): ");
-        String[] parts = input.nextLine().split(",");
+    private static void encryptFile() throws IOException, GeneralSecurityException {
+        Path path = Path.of(ConsoleInput.path("Drag an image or video here: "));
+        vault.addFile(new SecureFile(path, ConsoleInput.text("Password for the file: ")));
+        save();  // save now, so the file password is never lost
+        System.out.println("Encrypted into vault_files/. The original was kept.");
+    }
 
-        String networkName = parts[0];
-        String password    = parts[1];
+    private static void decryptFile() throws IOException, GeneralSecurityException {
+        Credential entry = vault.find(ConsoleInput.text("File name: "));
+        if (!(entry instanceof SecureFile)) {
+            System.out.println("No encrypted file with that name.");
+            return;
+        }
+        Path restored = ((SecureFile) entry).decrypt(ConsoleInput.text("Password: "));
+        System.out.println("Decrypted to " + restored);
+    }
 
-        vault.add(new WifiNetwork(networkName, password));
+    private static void remove() {
+        boolean removed = vault.remove(ConsoleInput.text("Name to remove: "));
+        System.out.println(removed ? "Removed." : "No entry with that name.");
+    }
+
+    private static void statistics() {
+        System.out.println("Entries per type: " + vault.countByType());
+        System.out.println("Weak passwords:");
+        print(vault.weakPasswords());
+    }
+
+    // Polymorphism: each object runs its own describe().
+    private static void print(List<Credential> list) {
+        if (list.isEmpty()) {
+            System.out.println("(nothing)");
+        }
+        for (Credential c : list) {
+            System.out.println(c.describe());
+        }
+    }
+
+    private static boolean save() {
+        try {
+            vault.save();
+            return true;
+        } catch (IOException | GeneralSecurityException e) {
+            System.out.println("Could not save: " + e.getMessage());
+            return false;
+        }
     }
 }
