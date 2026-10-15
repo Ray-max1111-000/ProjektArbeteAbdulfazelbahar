@@ -1,4 +1,5 @@
 import java.nio.ByteBuffer;
+import java.security.GeneralSecurityException;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -15,12 +16,12 @@ public class Authenticator {
     private static final String BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
     // Returns true if the code the user typed matches the code for right now.
-    public static boolean verify(int userCode) throws Exception {
+    public static boolean verify(int userCode) throws GeneralSecurityException {
         return userCode == generateCurrentCode();
     }
 
     // Calculates the 6-digit code for the current 30-second window.
-    private static int generateCurrentCode() throws Exception {
+    private static int generateCurrentCode() throws GeneralSecurityException {
         // 1. Which 30-second window are we in? (changes every 30 seconds)
         long timeWindow = System.currentTimeMillis() / 1000 / 30;
 
