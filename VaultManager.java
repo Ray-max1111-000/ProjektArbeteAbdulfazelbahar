@@ -1,76 +1,118 @@
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
-// Keeps all credentials in a list, and saves/loads them to an encrypted file.
+// Holds all credentials and the rules for them: add, search, remove, statistics, save and load.
 public class VaultManager {
 
     private static final Path VAULT_FILE = Path.of("vault.dat");
-
     private final List<Credential> credentials = new ArrayList<>();
-    private final String encryptionKey;
+    private final String key;
 
-    public VaultManager(String encryptionKey) {
-        this.encryptionKey = encryptionKey;
+    public VaultManager(String key) {
+        this.key = key;
     }
 
-    // Adds one credential to the list.
+    // Names are unique, so one entry can always be found by its name.
     public void add(Credential credential) {
+        if (find(credential.getName()) != null) {
+            throw new IllegalArgumentException("'" + credential.getName() + "' already exists.");
+        }
         credentials.add(credential);
     }
 
-    // Prints every credential on the screen.
-    public void view() {
-        for (Credential credential : credentials) {
-            credential.print();
+    // Encrypts first and adds afterwards, so a failed encryption leaves no broken entry.
+    public void addFile(SecureFile file) throws IOException, GeneralSecurityException {
+        if (find(file.getName()) != null) {
+            throw new IllegalArgumentException("'" + file.getName() + "' already exists.");
         }
+        file.encrypt();
+        credentials.add(file);
     }
 
-    // Turns all credentials into text, encrypts it, and writes it to vault.dat.
-    public void save() throws Exception {
-        StringBuilder text = new StringBuilder();
-        for (Credential credential : credentials) {
-            text.append(credential.toCsv()).append("\n");
-        }
-
-        String encrypted = Crypto.encrypt(text.toString(), encryptionKey);
-        Files.writeString(VAULT_FILE, encrypted);
+    public List<Credential> getAll() {
+        return credentials;
     }
 
-    // Reads vault.dat, decrypts it, and rebuilds the credentials.
-    // Returns false if the file could not be read (for example, wrong key).
-    public boolean load() {
-        // First time running: no file yet, so there is nothing to load.
-        if (!Files.exists(VAULT_FILE)) {
-            return true;
-        }
-
-        try {
-            String encrypted = Files.readString(VAULT_FILE);
-            String text = Crypto.decrypt(encrypted, encryptionKey);
-
-            for (String line : text.split("\n")) {
-                if (!line.isBlank()) {
-                    credentials.add(createFromCsv(line));
-                }
+    public Credential find(String name) {
+        for (Credential c : credentials) {
+            if (c.getName().equalsIgnoreCase(name.trim())) {
+                return c;
             }
-            return true;
-        } catch (Exception e) {
-            return false;
+        }
+        return null;
+    }
+
+    public List<Credential> search(String text) {
+        List<Credential> matches = new ArrayList<>();
+        for (Credential c : credentials) {
+            if (c.getName().toLowerCase().contains(text.trim().toLowerCase())) {
+                matches.add(c);
+            }
+        }
+        return matches;
+    }
+
+    public boolean remove(String name) {
+        return credentials.remove(find(name));
+    }
+
+    // Example: {FILE=2, WEB=3, WIFI=1}
+    public Map<String, Integer> countByType() {
+        Map<String, Integer> counts = new TreeMap<>();
+        for (Credential c : credentials) {
+            counts.merge(c.getType(), 1, Integer::sum);
+        }
+        return counts;
+    }
+
+    // Polymorphism through the interface: each class has its own rule for "weak".
+    public List<Credential> weakPasswords() {
+        List<Credential> weak = new ArrayList<>();
+        for (Credential c : credentials) {
+            if (c instanceof StrengthCheckable && ((StrengthCheckable) c).hasWeakPassword()) {
+                weak.add(c);
+            }
+        }
+        return weak;
+    }
+
+    public void save() throws IOException, GeneralSecurityException {
+        StringBuilder text = new StringBuilder();
+        for (Credential c : credentials) {
+            text.append(c.toCsv()).append("\n");
+        }
+        Files.write(VAULT_FILE, Crypto.encrypt(text.toString().getBytes(), key));
+    }
+
+    public void load() throws IOException, GeneralSecurityException {
+        if (!Files.exists(VAULT_FILE)) {
+            return;  // first run
+        }
+        String text = new String(Crypto.decrypt(Files.readAllBytes(VAULT_FILE), key));
+        for (String line : text.split("\n")) {
+            if (!line.isBlank()) {
+                credentials.add(fromCsv(line.split(",")));
+            }
         }
     }
 
-    // Turns one saved line back into the right type of credential.
-    //   "WEB,name,user,pass"  -> WebLogin
-    //   "WIFI,name,pass"      -> WifiNetwork
-    private Credential createFromCsv(String line) {
-        String[] parts = line.split(",");
-        String type = parts[0];
-
-        if (type.equals("WEB")) {
-            return new WebLogin(parts[1], parts[2], parts[3]);
+    // A new credential type only needs a new subclass and one new case here.
+    private Credential fromCsv(String[] p) {
+        try {
+            switch (p[0]) {
+                case "WEB":  return new WebLogin(p[1], p[2], p[3]);
+                case "WIFI": return new WifiNetwork(p[1], p[2]);
+                case "FILE": return new SecureFile(Path.of(p[2]), p[1]);
+                default: throw new IllegalArgumentException("vault.dat has an unknown entry type: " + p[0]);
+            }
+        } catch (ArrayIndexOutOfBoundsException e) {
+            throw new IllegalArgumentException("vault.dat has a damaged entry.");
         }
-        return new WifiNetwork(parts[1], parts[2]);
     }
 }
